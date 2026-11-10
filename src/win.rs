@@ -21,6 +21,7 @@ use windows_sys::Win32::System::Power::*;
 use windows_sys::Win32::System::Registry::*;
 use windows_sys::Win32::System::Shutdown::LockWorkStation;
 use windows_sys::Win32::System::SystemInformation::{GetLocalTime, GetTickCount};
+use windows_sys::Win32::System::SystemServices::GUID_CONSOLE_DISPLAY_STATE;
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::HiDpi::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
@@ -64,6 +65,8 @@ const PROCESS_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const PREVIEW_DURATION: Duration = Duration::from_secs(10);
 
 const SC_MONITORPOWER_OFF: LPARAM = 2;
+/// How many ticks to keep trying to wake the screen before giving up.
+const WAKE_ATTEMPTS: u32 = 6;
 
 const HOTKEY_TOGGLE: i32 = 1;
 const HOTKEY_SCREEN_OFF: i32 = 2;
@@ -156,6 +159,11 @@ pub(crate) struct App {
     config_mtime: Cell<Option<SystemTime>>,
     phase: Cell<Phase>,
     display_required: Cell<bool>,
+    /// Whether the screen is on, as far as we know: Windows tells us when
+    /// that changes, however it came about.
+    display_on: Cell<bool>,
+    /// How many more ticks to keep trying to wake the screen.
+    wake_attempts: Cell<u32>,
     tick_ms: Cell<u32>,
     /// What is keeping the screen on right now, if anything.
     hold: Cell<Option<Hold>>,
@@ -264,6 +272,8 @@ pub fn run() {
             config_mtime: Cell::new(None),
             phase: Cell::new(Phase::Active),
             display_required: Cell::new(false),
+            display_on: Cell::new(true),
+            wake_attempts: Cell::new(0),
             tick_ms: Cell::new(TICK_MS),
             hold: Cell::new(None),
             last_hold: Cell::new(None),
@@ -292,6 +302,9 @@ pub fn run() {
         APP.with(|cell| {
             let _ = cell.set(app);
         });
+        // Ask to be told when the screen turns on or off. Done only now
+        // because the first report can arrive before this call returns.
+        RegisterPowerSettingNotification(hwnd, &GUID_CONSOLE_DISPLAY_STATE, DEVICE_NOTIFY_WINDOW_HANDLE);
 
         let mut msg: MSG = zeroed();
         while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
@@ -348,7 +361,8 @@ impl App {
             self.last_activity.set(Some(now));
             self.last_hold.set(Some((hold, local_minute_of_day())));
         }
-        if self.hold.replace(hold) != hold {
+        let previous_hold = self.hold.replace(hold);
+        if previous_hold != hold {
             self.log(&match hold {
                 Some(hold) => format!("Keeping the screen on: {}", hold.reason()),
                 None => "Nothing is keeping the screen on any more".to_string(),
@@ -389,6 +403,17 @@ impl App {
         // and once we've acted, and whenever we're disabled.
         let in_charge = enabled && new == Phase::Active && (config.block_windows_timeout || held);
         self.require_display(keeping_on || in_charge);
+        // Music starting or a controller being picked up while the screen is
+        // off should bring it back, as touching the mouse would. Windows
+        // only does that for real input, so it needs a push. Only when one
+        // *starts*, so that turning the screen off by hand while music is
+        // already playing leaves it off.
+        let hold_started = held && previous_hold.is_none();
+        if hold_started && config.wake_on_activity && (!self.display_on.get() || old == Phase::Off) {
+            self.log("Activity started while the screen was off");
+            self.wake_attempts.set(WAKE_ATTEMPTS);
+        }
+        self.wake_screen_if_wanted();
 
         let counting_down = matches!(new, Phase::Warning { .. });
         if counting_down && !matches!(old, Phase::Warning { .. }) && config.warning_sound {
@@ -519,10 +544,60 @@ impl App {
     }
 
     fn turn_screen_off(&self) {
+        self.log("Turning the screen off");
         self.require_display(false);
+        // Assumed until Windows reports the real state.
+        self.display_on.set(false);
         // Sent to our own window (DefWindowProc acts on it). Broadcasting it,
         // as is often done, can hang on any unresponsive window.
         unsafe { SendMessageW(self.hwnd, WM_SYSCOMMAND, SC_MONITORPOWER as WPARAM, SC_MONITORPOWER_OFF) };
+    }
+
+    /// Windows reports that the screen has turned on or off.
+    fn display_changed(&self, on: bool) {
+        if self.display_on.replace(on) != on {
+            self.log(if on {
+                "The screen is now on"
+            } else {
+                "The screen is now off"
+            });
+        }
+    }
+
+    /// Turns the screen back on, if that has been asked for and hasn't
+    /// happened yet. Asking for the display to be kept on does not wake one
+    /// that is already off; only input does that reliably, so this nudges
+    /// the mouse one pixel and back, once a tick until the screen responds.
+    fn wake_screen_if_wanted(&self) {
+        let attempts = self.wake_attempts.get();
+        if attempts == 0 {
+            return;
+        }
+        if self.display_on.get() && attempts < WAKE_ATTEMPTS {
+            self.wake_attempts.set(0);
+            return;
+        }
+        self.wake_attempts.set(attempts - 1);
+        if attempts == 1 {
+            // Out of tries. Stop assuming the screen is off, so that the
+            // next thing to start gets a fresh set of attempts.
+            self.log("Gave up trying to wake the screen");
+            self.display_on.set(true);
+            return;
+        }
+        self.log("Nudging the mouse to wake the screen");
+        let nudge = |dx: i32| unsafe {
+            let mut input: INPUT = zeroed();
+            input.r#type = INPUT_MOUSE;
+            input.Anonymous.mi.dx = dx;
+            input.Anonymous.mi.dwFlags = MOUSEEVENTF_MOVE;
+            SendInput(1, &input, size_of::<INPUT>() as i32);
+        };
+        unsafe { SetThreadExecutionState(ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED) };
+        // Alternate direction so repeated attempts don't walk the cursor.
+        let direction = if attempts.is_multiple_of(2) { 1 } else { -1 };
+        nudge(direction);
+        nudge(-direction);
     }
 
     /// "Turn screen off now": acts after a short delay, so that letting go
@@ -1410,6 +1485,17 @@ unsafe extern "system" fn main_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam
                 _ => {}
             });
             0
+        }
+        WM_POWERBROADCAST if wparam == PBT_POWERSETTINGCHANGE as usize => {
+            let setting = &*(lparam as *const POWERBROADCAST_SETTING);
+            let (a, b) = (setting.PowerSetting, GUID_CONSOLE_DISPLAY_STATE);
+            let about_display = (a.data1, a.data2, a.data3, a.data4) == (b.data1, b.data2, b.data3, b.data4);
+            if about_display && setting.DataLength >= 1 {
+                // 0 is off; 1 (on) and 2 (dimmed) both count as on.
+                let on = setting.Data[0] != 0;
+                with_app(|app| app.display_changed(on));
+            }
+            1
         }
         WM_HOTKEY => {
             with_app(|app| match wparam as i32 {

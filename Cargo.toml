@@ -1,6 +1,6 @@
 [package]
 name = "screensleep"
-version = "2.1.0"
+version = "2.1.2"
 edition = "2021"
 description = "Tray utility that turns the screen off after a period of inactivity, with a cancellable warning."
 license = "MIT"
@@ -15,6 +15,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Diagnostics_Debug",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_Shutdown",
+    "Win32_System_SystemServices",
     "Win32_System_LibraryLoader",
     "Win32_System_Power",
     "Win32_System_Registry",

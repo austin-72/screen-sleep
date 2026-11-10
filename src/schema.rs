@@ -97,6 +97,11 @@ pub static TABS: &[Tab] = &[
                 Kind::Bool,
             ),
             field("keep_awake_edges", "Edges (top, left, bottom, right)", Kind::Text),
+            field(
+                "wake_on_activity",
+                "Turn the screen back on when one of these starts",
+                Kind::Bool,
+            ),
         ],
     },
     Tab {

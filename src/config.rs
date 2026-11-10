@@ -276,6 +276,9 @@ pub struct Config {
     pub keep_awake_edges: Edges,
     /// Lower-case executable names, e.g. `vlc.exe`.
     pub keep_awake_processes: Vec<String>,
+    /// Turn the screen back on when one of the above starts while it is
+    /// off (music starting, a controller being picked up).
+    pub wake_on_activity: bool,
 
     // --- Countdown ---
     /// 0 disables the countdown.
@@ -351,6 +354,7 @@ impl Default for Config {
                 right: false,
             },
             keep_awake_processes: Vec::new(),
+            wake_on_activity: true,
 
             warning_seconds: 30,
             warning_sound: false,
@@ -448,6 +452,7 @@ impl Config {
             "keep_awake_processes" => {
                 self.keep_awake_processes = list_items(value).map(str::to_lowercase).collect();
             }
+            "wake_on_activity" => self.wake_on_activity = boolean(value)?,
 
             "warning_seconds" => self.warning_seconds = number(value, 0, MAX_WARNING_SECONDS)?,
             "warning_sound" => self.warning_sound = boolean(value)?,
@@ -593,6 +598,11 @@ impl Config {
             "Keep the screen on while any of these programs is running, e.g. vlc.exe, obs64.exe.",
             "keep_awake_processes",
             self.keep_awake_processes.join(", "),
+        );
+        out.setting(
+            "Turn the screen back on when one of the above starts while it is off, e.g. when\nmusic starts playing.",
+            "wake_on_activity",
+            self.wake_on_activity,
         );
 
         out.section("Countdown");
@@ -888,6 +898,7 @@ mod tests {
                 right: true,
             },
             keep_awake_processes: vec!["vlc.exe".into(), "obs64.exe".into()],
+            wake_on_activity: false,
             warning_seconds: 10,
             warning_sound: true,
             warning_position: Position::BottomRight,

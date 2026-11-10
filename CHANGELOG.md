@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.1.2
+
+### Fixed
+
+- Waking the screen when music starts now also works when the screen was
+  turned off with "Turn screen off now" or by Windows itself, not only when
+  screenSleep's own timeout turned it off. It keeps trying for a few seconds
+  until the screen responds.
+- Turning the screen off by hand while music is already playing leaves it
+  off.
+
+## 2.1.1
+
+### Fixed
+
+- Music or video starting while the screen was off was detected but did not
+  turn the screen back on. It now does, as does picking up a game
+  controller. This can be switched off ("Turn the screen back on when one of
+  these starts", or `wake_on_activity` in the settings file).
+
 ## 2.1.0
 
 ### New

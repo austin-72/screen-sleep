@@ -203,6 +203,7 @@ static TABLE: &[[&str; 4]] = &[
     ["While these programs run (e.g. vlc.exe)", "Mientras se ejecutan estos programas (p. ej. vlc.exe)", "Solange diese Programme laufen (z. B. vlc.exe)", "Tant que ces programmes s'exécutent (p. ex. vlc.exe)"],
     ["While the cursor is at a chosen screen edge", "Mientras el cursor está en un borde elegido", "Solange der Mauszeiger an einem gewählten Rand ist", "Tant que le curseur est sur un bord choisi"],
     ["Edges (top, left, bottom, right)", "Bordes (top, left, bottom, right)", "Ränder (top, left, bottom, right)", "Bords (top, left, bottom, right)"],
+    ["Turn the screen back on when one of these starts", "Volver a encender la pantalla cuando empiece alguno de estos", "Bildschirm wieder einschalten, wenn eines davon beginnt", "Rallumer l'écran quand l'un de ces éléments commence"],
 
     ["Length (0 = no countdown)", "Duración (0 = sin cuenta atrás)", "Dauer (0 = kein Countdown)", "Durée (0 = pas de compte à rebours)"],
     ["Size", "Tamaño", "Größe", "Taille"],
