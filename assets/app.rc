@@ -1,0 +1,7 @@
+// 1: dark glyph (also the .exe icon). 2: light glyph, for dark taskbars.
+1 ICON "screensleep.ico"
+2 ICON "screensleep-light.ico"
+
+// The manifest gives the settings window modern-looking controls and tells
+// Windows the app handles display scaling itself. (24 = RT_MANIFEST.)
+1 24 "app.manifest"
