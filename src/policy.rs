@@ -56,6 +56,18 @@ pub fn pulse_level(elapsed_ms: u64, period_ms: u64) -> f32 {
     0.5 - 0.5 * (turn * std::f32::consts::TAU).cos()
 }
 
+/// Whether sound heard now should be put down to a sound the app itself
+/// started `since_started_ms` ago (the countdown's alert), rather than to
+/// media. Our sound is taken to last until the first silence, however long
+/// the user's chosen alert is; the first second is covered regardless,
+/// because the sound may not have begun by the first sample. Capped, so
+/// music that starts during the alert is noticed in the end.
+pub fn is_own_sound(since_started_ms: u64, audible: bool) -> bool {
+    const STARTS_WITHIN_MS: u64 = 1_000;
+    const LONGEST_MS: u64 = 15_000;
+    since_started_ms < LONGEST_MS && (audible || since_started_ms < STARTS_WITHIN_MS)
+}
+
 /// While checking whether a sound is sustained, a silence longer than this
 /// ends the attempt. Short enough to separate one chime from the next, long
 /// enough to ride over the pauses within speech and music.
@@ -239,6 +251,19 @@ mod tests {
         assert!(close(pulse_level(1000, 1000), 0.0));
         assert!(close(pulse_level(123_500, 1000), 1.0));
         assert_eq!(pulse_level(500, 0), 0.0);
+    }
+
+    #[test]
+    fn own_alert_sound_is_not_media() {
+        // A long "dinggg": audible from 0.2 s to 4 s after it was started.
+        assert!(is_own_sound(0, false)); // not begun yet
+        assert!(is_own_sound(200, true));
+        assert!(is_own_sound(3_900, true));
+        // First silence after it: over. Sound from here on is something else.
+        assert!(!is_own_sound(4_200, false));
+        // Music that started during the alert is noticed after the cap.
+        assert!(is_own_sound(14_999, true));
+        assert!(!is_own_sound(15_000, true));
     }
 
     /// Runs a tracker over `(time_ms, audible)` samples, 2 s minimum.

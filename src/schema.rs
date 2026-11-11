@@ -4,7 +4,7 @@
 //! `Config::values` and `Config::set`, so it can never disagree with the
 //! settings file about what a setting is called or what values it takes.
 
-use crate::config::{Action, ClickAction, IconStyle, LanguageChoice, Position, WarningMonitor};
+use crate::config::{Action, ClickAction, IconStyle, LanguageChoice, Position, SystemSounds, WarningMonitor};
 
 pub enum Kind {
     /// A tick box.
@@ -75,6 +75,11 @@ pub static TABS: &[Tab] = &[
                 "media_ignore_processes",
                 "Ignore sound from (e.g. discord.exe)",
                 Kind::Text,
+            ),
+            field(
+                "media_ignore_system_sounds",
+                "Ignore Windows system sounds",
+                Kind::Choice(SystemSounds::options),
             ),
             field(
                 "controller_counts_as_input",

@@ -1,4 +1,4 @@
-# Screen sleep
+# screenSleep
 
 A tiny Windows tray utility that turns the screen off after a period of
 inactivity. Thirty seconds beforehand it shows a countdown; moving the mouse or
@@ -56,7 +56,7 @@ setting keeps its default.
 | Group | What you can change |
 | --- | --- |
 | General | Action at timeout; timeout; a separate timeout on battery; a daily schedule (e.g. only 22:00-07:00); whether to hold off Windows' own display timeout; the delay before "Turn screen off now"; how long "keep screen on" lasts |
-| Keeping the screen on | Media playing, how long sound must last to count (so chimes are ignored), and programs whose sound to ignore (a voice call, say); game controllers; full-screen apps; which screen edges hold it on; a list of programs that hold it on while running |
+| Keeping the screen on | Media playing, how long sound must last to count (so chimes are ignored), programs whose sound to ignore (a voice call, say), and whether to ignore Windows system sounds; game controllers; full-screen apps; which screen edges hold it on; a list of programs that hold it on while running |
 | Language | English, Spanish, German or French; follows Windows by default |
 | Countdown | Length; sound; fade in and out; rounded corners; darkening the rest of the screen; position; which monitors (all, the one with the cursor, or the main one); size; opacity; background, text and number colours; the pulsing outline (on/off, its two colours, thickness, speed); font; the title and hint text; whether the hint shows |
 | Tray | Icon colour; what left-click and middle-click do; notifications; which timeouts the menu offers |

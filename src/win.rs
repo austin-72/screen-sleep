@@ -164,6 +164,9 @@ pub(crate) struct App {
     display_on: Cell<bool>,
     /// How many more ticks to keep trying to wake the screen.
     wake_attempts: Cell<u32>,
+    /// When the app last played a sound of its own that hasn't yet been
+    /// heard to finish, so that it isn't mistaken for media.
+    own_sound: Cell<Option<Instant>>,
     tick_ms: Cell<u32>,
     /// What is keeping the screen on right now, if anything.
     hold: Cell<Option<Hold>>,
@@ -274,6 +277,7 @@ pub fn run() {
             display_required: Cell::new(false),
             display_on: Cell::new(true),
             wake_attempts: Cell::new(0),
+            own_sound: Cell::new(None),
             tick_ms: Cell::new(TICK_MS),
             hold: Cell::new(None),
             last_hold: Cell::new(None),
@@ -417,6 +421,7 @@ impl App {
 
         let counting_down = matches!(new, Phase::Warning { .. });
         if counting_down && !matches!(old, Phase::Warning { .. }) && config.warning_sound {
+            self.own_sound.set(Some(now));
             unsafe { MessageBeep(MB_ICONWARNING) };
         }
         // Only on the transition, so we don't act again if something else
@@ -447,7 +452,17 @@ impl App {
         let audible = self
             .audio
             .as_ref()
-            .is_some_and(|audio| audio.is_audible(&config.media_ignore_processes));
+            .is_some_and(|audio| audio.is_audible(&config.media_ignore_processes, config.ignores_system_sounds()));
+        // The countdown's own alert must not count as media, or it would
+        // cancel the very countdown it announces.
+        let audible = match self.own_sound.get() {
+            Some(started) if policy::is_own_sound(started.elapsed().as_millis() as u64, audible) => false,
+            Some(_) => {
+                self.own_sound.set(None);
+                audible
+            }
+            None => audible,
+        };
         let now_ms = self.started.elapsed().as_millis() as u64;
         let min_ms = u64::from(config.media_min_seconds) * 1000;
         let sound = self.sound.get().update(now_ms, audible, min_ms);

@@ -141,6 +141,16 @@ setting_enum! {
     }
 }
 
+setting_enum! {
+    /// Whether Windows' own sounds (alerts, notifications) are left out
+    /// when listening for media.
+    SystemSounds {
+        Auto => "auto", "When the countdown plays a sound";
+        Always => "always", "Always";
+        Never => "never", "Never";
+    }
+}
+
 /// The default text under the countdown's number.
 pub const DEFAULT_HINT: &str = "Move the mouse or press a key to cancel";
 
@@ -269,6 +279,7 @@ pub struct Config {
     pub media_min_seconds: u32,
     /// Sound from these programs (lower-case executable names) is ignored.
     pub media_ignore_processes: Vec<String>,
+    pub media_ignore_system_sounds: SystemSounds,
     /// Game controllers count as input, which Windows itself doesn't do.
     pub controller_counts_as_input: bool,
     pub fullscreen_keeps_awake: bool,
@@ -344,6 +355,7 @@ impl Default for Config {
             media_keeps_awake: true,
             media_min_seconds: 2,
             media_ignore_processes: Vec::new(),
+            media_ignore_system_sounds: SystemSounds::Auto,
             controller_counts_as_input: true,
             fullscreen_keeps_awake: false,
             edge_keeps_awake: false,
@@ -445,6 +457,7 @@ impl Config {
             "media_ignore_processes" => {
                 self.media_ignore_processes = list_items(value).map(str::to_lowercase).collect();
             }
+            "media_ignore_system_sounds" => self.media_ignore_system_sounds = SystemSounds::from_key(value)?,
             "controller_counts_as_input" => self.controller_counts_as_input = boolean(value)?,
             "fullscreen_keeps_awake" => self.fullscreen_keeps_awake = boolean(value)?,
             "edge_keeps_awake" => self.edge_keeps_awake = boolean(value)?,
@@ -491,6 +504,15 @@ impl Config {
             _ => return Err(format!("\"{key}\" is not a setting I know")),
         }
         Ok(())
+    }
+
+    /// Whether Windows' own sounds are left out when listening for media.
+    pub fn ignores_system_sounds(&self) -> bool {
+        match self.media_ignore_system_sounds {
+            SystemSounds::Always => true,
+            SystemSounds::Never => false,
+            SystemSounds::Auto => self.warning_sound,
+        }
     }
 
     /// The timeout that applies given the current power source.
@@ -573,6 +595,11 @@ impl Config {
             "Ignore sound from these programs, e.g. discord.exe, so that a voice call doesn't count.",
             "media_ignore_processes",
             self.media_ignore_processes.join(", "),
+        );
+        out.setting(
+            "Ignore Windows' own sounds (alerts, notifications): auto, always or never. With auto\nthey are ignored while the countdown is set to play a sound, since that is one of them.",
+            "media_ignore_system_sounds",
+            self.media_ignore_system_sounds.key(),
         );
         out.setting(
             "Count game controllers as input. Windows doesn't, so without this the timeout can\nhit in the middle of a game.",
@@ -923,6 +950,7 @@ mod tests {
             notifications: false,
             timeout_menu: vec![3, 7, 90],
             media_ignore_processes: vec!["discord.exe".into()],
+            media_ignore_system_sounds: SystemSounds::Never,
             controller_counts_as_input: false,
             debug_log: true,
             language: LanguageChoice::German,
@@ -1056,6 +1084,19 @@ mod tests {
         assert!(Schedule::parse("25:00-07:00").is_err());
         assert!(Schedule::parse("22:60-07:00").is_err());
         assert_eq!(Schedule::parse("00:00-24:00").unwrap().to_string(), "00:00-24:00");
+    }
+
+    #[test]
+    fn system_sounds_follow_the_countdown_sound_by_default() {
+        let config = |sound, choice| Config {
+            warning_sound: sound,
+            media_ignore_system_sounds: choice,
+            ..Config::default()
+        };
+        assert!(config(true, SystemSounds::Auto).ignores_system_sounds());
+        assert!(!config(false, SystemSounds::Auto).ignores_system_sounds());
+        assert!(config(false, SystemSounds::Always).ignores_system_sounds());
+        assert!(!config(true, SystemSounds::Never).ignores_system_sounds());
     }
 
     #[test]

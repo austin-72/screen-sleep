@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.4
+
+### New
+
+- **Ignore Windows system sounds** when listening for media ("Keep screen on"
+  tab, or `media_ignore_system_sounds`): always, never, or by default
+  whenever the countdown is set to play a sound.
+
+## 2.1.3
+
+### Fixed
+
+- With "Play a sound" switched on, a countdown alert longer than the media
+  threshold was itself taken for media and cancelled the countdown, so the
+  screen never turned off. The app's own alert is now ignored.
+
 ## 2.1.2
 
 ### Fixed
