@@ -1,4 +1,4 @@
-# screenSleep
+# Screen sleep
 
 A tiny Windows tray utility that turns the screen off after a period of
 inactivity. Thirty seconds beforehand it shows a countdown; moving the mouse or
